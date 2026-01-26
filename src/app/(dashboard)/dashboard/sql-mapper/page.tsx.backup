@@ -1,0 +1,139 @@
+'use client'
+
+import { useState } from 'react'
+import { parseSql, generateInputMapping, generateInputSchema, generateResultMapping, generateResultSchema } from '@/lib/sql-parser'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+export default function SqlMapperPage() {
+  const [sql, setSql] = useState('')
+  const [dialect, setDialect] = useState<'postgres' | 'mysql'>('postgres')
+  const [inputMapping, setInputMapping] = useState('')
+  const [inputSchema, setInputSchema] = useState('')
+  const [resultMapping, setResultMapping] = useState('')
+  const [resultSchema, setResultSchema] = useState('')
+
+  function handleParse() {
+    const result = parseSql(sql, dialect)
+    setInputMapping(generateInputMapping(result))
+    setInputSchema(generateInputSchema(result))
+    setResultMapping(generateResultMapping(result))
+    setResultSchema(generateResultSchema(result))
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text)
+  }
+
+  function downloadFile(content: string, filename: string) {
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>SQL Mapper Tool</CardTitle>
+          <CardDescription>Parse SQL queries and generate mapping files</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>SQL Dialect</Label>
+            <Select value={dialect} onValueChange={(value: 'postgres' | 'mysql') => setDialect(value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select dialect" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="postgres">PostgreSQL</SelectItem>
+                <SelectItem value="mysql">MySQL</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="sql">SQL Query</Label>
+            <Textarea
+              id="sql"
+              placeholder="Enter your SQL query here..."
+              value={sql}
+              onChange={(e) => setSql(e.target.value)}
+              rows={10}
+            />
+          </div>
+          <Button onClick={handleParse}>Parse SQL</Button>
+        </CardContent>
+      </Card>
+
+      {inputMapping && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Generated Mappings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="inputMapping">
+              <TabsList>
+                <TabsTrigger value="inputMapping">inputMapping.js</TabsTrigger>
+                <TabsTrigger value="inputSchema">inputSchema.json</TabsTrigger>
+                <TabsTrigger value="resultMapping">resultMapping.js</TabsTrigger>
+                <TabsTrigger value="resultSchema">resultSchema.json</TabsTrigger>
+              </TabsList>
+              <TabsContent value="inputMapping" className="space-y-4">
+                <div className="space-y-2">
+                  <Textarea value={inputMapping} readOnly rows={20} />
+                  <div className="flex gap-2">
+                    <Button onClick={() => copyToClipboard(inputMapping)}>Copy</Button>
+                    <Button onClick={() => downloadFile(inputMapping, 'inputMapping.js')}>
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="inputSchema" className="space-y-4">
+                <div className="space-y-2">
+                  <Textarea value={inputSchema} readOnly rows={20} />
+                  <div className="flex gap-2">
+                    <Button onClick={() => copyToClipboard(inputSchema)}>Copy</Button>
+                    <Button onClick={() => downloadFile(inputSchema, 'inputSchema.json')}>
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="resultMapping" className="space-y-4">
+                <div className="space-y-2">
+                  <Textarea value={resultMapping} readOnly rows={20} />
+                  <div className="flex gap-2">
+                    <Button onClick={() => copyToClipboard(resultMapping)}>Copy</Button>
+                    <Button onClick={() => downloadFile(resultMapping, 'resultMapping.js')}>
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="resultSchema" className="space-y-4">
+                <div className="space-y-2">
+                  <Textarea value={resultSchema} readOnly rows={20} />
+                  <div className="flex gap-2">
+                    <Button onClick={() => copyToClipboard(resultSchema)}>Copy</Button>
+                    <Button onClick={() => downloadFile(resultSchema, 'resultSchema.json')}>
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,191 @@
+export interface SqlParameter {
+  name: string
+  camelCase: string
+}
+
+export interface SqlColumn {
+  name: string
+  camelCase: string
+}
+
+export interface SqlParseResult {
+  parameters: SqlParameter[]
+  columns: SqlColumn[]
+}
+
+function toCamelCase(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/([-_][a-z])/g, (group) => group.toUpperCase().replace('-', '').replace('_', ''))
+}
+
+function extractPostgresParameters(sql: string): SqlParameter[] {
+  const regex = /@(\w+)/g
+  const matches = new Set<string>()
+  let match
+
+  while ((match = regex.exec(sql)) !== null) {
+    matches.add(match[1])
+  }
+
+  return Array.from(matches).map((name) => ({
+    name,
+    camelCase: toCamelCase(name),
+  }))
+}
+
+function extractPostgresColumns(sql: string): SqlColumn[] {
+  const selectRegex = /SELECT\s+([\s\S]+?)\s+FROM/i
+  const match = sql.match(selectRegex)
+
+  if (!match) {
+    return []
+  }
+
+  const columnsStr = match[1]
+  const columns = columnsStr
+    .split(',')
+    .map((col) => col.trim())
+    .filter((col) => col && !col.toLowerCase().includes(' as '))
+    .map((col) => {
+      const parts = col.split('.')
+      const lastPart = parts[parts.length - 1]
+      return lastPart.toUpperCase()
+    })
+
+  return columns.map((name) => ({
+    name,
+    camelCase: toCamelCase(name),
+  }))
+}
+
+function extractMySQLParameters(sql: string): SqlParameter[] {
+  const regex = /:(\w+)/g
+  const matches = new Set<string>()
+  let match
+
+  while ((match = regex.exec(sql)) !== null) {
+    matches.add(match[1])
+  }
+
+  return Array.from(matches).map((name) => ({
+    name,
+    camelCase: toCamelCase(name),
+  }))
+}
+
+function extractMySQLColumns(sql: string): SqlColumn[] {
+  const selectRegex = /SELECT\s+([\s\S]+?)\s+FROM/i
+  const match = sql.match(selectRegex)
+
+  if (!match) {
+    return []
+  }
+
+  const columnsStr = match[1]
+  const columns = columnsStr
+    .split(',')
+    .map((col) => col.trim())
+    .filter((col) => col && !col.toLowerCase().includes(' as '))
+    .map((col) => {
+      const parts = col.split('.')
+      const lastPart = parts[parts.length - 1]
+      return lastPart.toUpperCase()
+    })
+
+  return columns.map((name) => ({
+    name,
+    camelCase: toCamelCase(name),
+  }))
+}
+
+export function parseSql(sql: string, dialect: 'postgres' | 'mysql'): SqlParseResult {
+  if (dialect === 'postgres') {
+    return {
+      parameters: extractPostgresParameters(sql),
+      columns: extractPostgresColumns(sql),
+    }
+  } else {
+    return {
+      parameters: extractMySQLParameters(sql),
+      columns: extractMySQLColumns(sql),
+    }
+  }
+}
+
+export function generateInputMapping(result: SqlParseResult): string {
+  const params = result.parameters.map((p) => `${p.camelCase}: criteria.${p.camelCase}`).join(',\n      ')
+
+  return `'use strict';
+
+module.exports = function (input) {
+    const criteria = input?.data?.criteria;
+
+    const output = {
+        parameters: {
+            ${params},
+        },
+    };
+
+    return output;
+};`
+}
+
+export function generateInputSchema(result: SqlParseResult): string {
+  const properties = result.parameters.map((p) => `
+                "${p.camelCase}": {
+                    "type": "string"
+                }`).join(',')
+
+  const required = result.parameters.map((p) => `"${p.camelCase}"`).join(', ')
+
+  return `{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "criteria": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {${properties}
+            },
+            "required": [${required}]
+        }
+    }
+}`
+}
+
+export function generateResultMapping(result: SqlParseResult): string {
+  const mappings = result.columns.map((c) => `
+    output.${c.camelCase} = input.${c.name};`).join('')
+
+  return `'use strict';
+
+module.exports = function resultMapping(input) {
+    const output = {};
+${mappings}
+    return output;
+};`
+}
+
+export function generateResultSchema(result: SqlParseResult): string {
+  const properties = result.columns.map((c) =>
+    ['SEQ_NUMBER', 'AMENDMENT_NUMBER'].includes(c.name)
+      ? `
+        "${c.camelCase}": {
+            "type": "integer"
+        }`
+      : `
+        "${c.camelCase}": {
+            "type": "string"
+        }`
+  ).join(',')
+
+  return `{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {${properties}
+    }
+}`
+}
