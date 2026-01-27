@@ -49,6 +49,7 @@ export async function getMergeRequest(gitlabUrl: string): Promise<GitLabMergeReq
 
 export function extractSonarLink(description: string): string | null {
   const patterns = [
+    /<a[^>]*href=["']([^"']+)["'][^>]*>.*?See analysis details on SonarQube.*?<\/a>/i,
     /See analysis details on SonarQube.*?\[([^\]]+)\]\(([^)]+)\)/,
     /See analysis details on SonarQube.*?(https?:\/\/[^\s]+)/,
     /\[View analysis on SonarQube\]\(([^)]+)\)/,
@@ -57,7 +58,9 @@ export function extractSonarLink(description: string): string | null {
   for (const pattern of patterns) {
     const match = description.match(pattern)
     if (match) {
-      return match[2] || match[1] || match[0]
+      let url = match[1] || match[2] || match[0]
+      url = url.replace(/&amp;/g, '&')
+      return url
     }
   }
 

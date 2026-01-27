@@ -44,9 +44,9 @@ export async function getIssues(
   apiUrl.searchParams.append('componentKey', projectKey)
   apiUrl.searchParams.append('pullRequest', pullRequest)
   
-  const resolved = issueStatuses === 'CLOSED' ? 'true' : 'false'
-  apiUrl.searchParams.append('resolved', resolved)
-  apiUrl.searchParams.append('ps', '500')
+  issueStatuses = issueStatuses === 'OPEN' ? 'OPEN' : issueStatuses
+  apiUrl.searchParams.append('issueStatuses', issueStatuses)
+  apiUrl.searchParams.append('ps', '100')
   
   console.log('Fetching SonarQube issues:', apiUrl.toString())
 
@@ -67,7 +67,7 @@ export async function getIssues(
   return data
 }
 
-export function formatIssues(issues: SonarIssue[]): string {
+export function formatIssues(issues: SonarIssue[], total: number): string {
   if (issues.length === 0) {
     return 'No issues found.'
   }
@@ -86,7 +86,7 @@ export function formatIssues(issues: SonarIssue[]): string {
     return acc
   }, {} as Record<string, SonarIssue[]>)
 
-  let result = `Total Issues: ${issues.length}\n\n`
+  let result = `Total Issues: ${total}\n\n`
 
   for (const severity of severityOrder) {
     const severityIssues = groupedBySeverity[severity]
@@ -98,7 +98,6 @@ export function formatIssues(issues: SonarIssue[]): string {
 
     for (const issue of severityIssues) {
       result += `📍 ${issue.component}${issue.line ? `:${issue.line}` : ''}\n`
-      result += `   Rule: ${issue.rule}\n`
       result += `   Message: ${issue.message}\n`
       result += `   Status: ${issue.status}\n\n`
     }
@@ -110,5 +109,5 @@ export function formatIssues(issues: SonarIssue[]): string {
 export async function fetchSonarIssues(sonarUrl: string): Promise<string> {
   const { projectKey, pullRequest, issueStatuses } = parseSonarUrl(sonarUrl)
   const response = await getIssues(projectKey, pullRequest, issueStatuses)
-  return formatIssues(response.issues)
+  return formatIssues(response.issues, response.total)
 }
