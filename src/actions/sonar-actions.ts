@@ -3,9 +3,14 @@
 import { getMergeRequest, extractSonarLink, postMergeRequestComment, formatGitlabIssuesComment, formatGitlabAIFixesComment } from '@/lib/gitlab-client'
 import { fetchSonarIssues } from '@/lib/sonar-client'
 import { isAiAvailable, generateFixes } from '@/lib/openai-client'
+import { isZaiAvailable, generateFixesWithZai } from '@/lib/zai-client'
 
-export async function checkAiAvailability(): Promise<boolean> {
-  return await isAiAvailable()
+export async function checkAiAvailability(): Promise<{ openai: boolean; zai: boolean }> {
+  const [openaiAvailable, zaiAvailable] = await Promise.all([
+    isAiAvailable(),
+    isZaiAvailable()
+  ])
+  return { openai: openaiAvailable, zai: zaiAvailable }
 }
 
 export async function checkGitlabConnection(): Promise<boolean> {
@@ -32,14 +37,21 @@ export async function fetchSonarIssuesAction(sonarUrl: string): Promise<string> 
   }
 }
 
-export async function generateAIFixesAction(issues: string): Promise<string> {
+export async function generateAIFixesAction(issues: string, provider: 'openai' | 'zai'): Promise<string> {
   try {
-    const available = await isAiAvailable()
-    if (!available) {
-      throw new Error('AI service is not configured. Please add OPENAI_API_KEY to .env file')
+    if (provider === 'openai') {
+      const available = await isAiAvailable()
+      if (!available) {
+        throw new Error('OpenAI API key is not configured. Please add OPENAI_API_KEY to .env file')
+      }
+      return await generateFixes(issues)
+    } else {
+      const available = await isZaiAvailable()
+      if (!available) {
+        throw new Error('Z.AI API key is not configured. Please add ZAI_API_KEY to .env file')
+      }
+      return await generateFixesWithZai(issues)
     }
-
-    return await generateFixes(issues)
   } catch (error) {
     console.error('Error generating AI fixes:', error)
     throw new Error(error instanceof Error ? error.message : 'Failed to generate AI fixes')
@@ -84,7 +96,7 @@ function parseGitlabUrl(url: string): { projectPath: string; mrId: string } {
   }
 
   const mrId = pathParts[mrIndex + 1]
-  const projectPath = pathParts.slice(0, mrIndex).join('/')
+  const projectPath = pathParts.slice(0, mrIndex).filter(part => part !== '-').join('/')
 
   return { projectPath, mrId }
 }

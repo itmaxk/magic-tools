@@ -23,7 +23,7 @@ export function parseGitlabUrl(url: string): { projectPath: string; mrId: string
   }
 
   const mrId = pathParts[mrIndex + 1]
-  const projectPath = pathParts.slice(0, mrIndex).join('/')
+  const projectPath = pathParts.slice(0, mrIndex).filter(part => part !== '-').join('/')
 
   return { projectPath, mrId }
 }

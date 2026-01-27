@@ -18,23 +18,37 @@ export interface SonarIssuesResponse {
   }
 }
 
-export function parseSonarUrl(url: string): { projectKey: string; pullRequest: string } {
+export function parseSonarUrl(url: string): {
+  projectKey: string
+  pullRequest: string
+  issueStatuses: string
+} {
   const urlObj = new URL(url)
-  const dashboardId = urlObj.searchParams.get('id')
+  const projectKey = urlObj.searchParams.get('id')
   const pullRequest = urlObj.searchParams.get('pullRequest')
+  const issueStatuses = urlObj.searchParams.get('issueStatuses') || 'OPEN'
 
-  if (!dashboardId || !pullRequest) {
+  if (!projectKey || !pullRequest) {
     throw new Error('Invalid SonarQube URL. Must contain "id" and "pullRequest" parameters.')
   }
 
-  return { projectKey: dashboardId, pullRequest }
+  return { projectKey, pullRequest, issueStatuses }
 }
 
-export async function getIssues(projectKey: string, pullRequest: string): Promise<SonarIssuesResponse> {
+export async function getIssues(
+  projectKey: string,
+  pullRequest: string,
+  issueStatuses: string
+): Promise<SonarIssuesResponse> {
   const apiUrl = new URL(`${process.env.SONAR_URL}/api/issues/search`)
   apiUrl.searchParams.append('componentKey', projectKey)
   apiUrl.searchParams.append('pullRequest', pullRequest)
+  
+  const resolved = issueStatuses === 'CLOSED' ? 'true' : 'false'
+  apiUrl.searchParams.append('resolved', resolved)
   apiUrl.searchParams.append('ps', '500')
+  
+  console.log('Fetching SonarQube issues:', apiUrl.toString())
 
   const response = await fetch(apiUrl.toString(), {
     headers: {
@@ -43,10 +57,14 @@ export async function getIssues(projectKey: string, pullRequest: string): Promis
   })
 
   if (!response.ok) {
+    console.error('SonarQube API error:', response.status, response.statusText)
     throw new Error(`Failed to fetch SonarQube issues: ${response.statusText}`)
   }
 
-  return await response.json()
+  const data = await response.json()
+  console.log('SonarQube response:', JSON.stringify({ total: data.total, paging: data.paging }, null, 2))
+  
+  return data
 }
 
 export function formatIssues(issues: SonarIssue[]): string {
@@ -90,7 +108,7 @@ export function formatIssues(issues: SonarIssue[]): string {
 }
 
 export async function fetchSonarIssues(sonarUrl: string): Promise<string> {
-  const { projectKey, pullRequest } = parseSonarUrl(sonarUrl)
-  const response = await getIssues(projectKey, pullRequest)
+  const { projectKey, pullRequest, issueStatuses } = parseSonarUrl(sonarUrl)
+  const response = await getIssues(projectKey, pullRequest, issueStatuses)
   return formatIssues(response.issues)
 }

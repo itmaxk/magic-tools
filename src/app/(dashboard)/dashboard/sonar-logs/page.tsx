@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { checkAiAvailability, checkGitlabConnection, fetchMergeRequestDetails, fetchSonarIssuesAction, generateAIFixesAction, postIssuesToGitLab, postAIFixesToGitLab } from '@/actions/sonar-actions'
 import { sharedStyles } from '@/styles/shared'
@@ -15,7 +16,8 @@ export default function SonarLogsPage() {
   const [sonarUrl, setSonarUrl] = useState('')
   const [issues, setIssues] = useState('')
   const [aiFixes, setAiFixes] = useState('')
-  const [isAiAvailable, setIsAiAvailable] = useState(false)
+  const [isAiAvailable, setIsAiAvailable] = useState<{ openai: boolean; zai: boolean }>({ openai: false, zai: false })
+  const [aiProvider, setAiProvider] = useState<'openai' | 'zai'>('openai')
   const [isAiFixesVisible, setIsAiFixesVisible] = useState(false)
   const [hasGitlabConnection, setHasGitlabConnection] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -30,6 +32,10 @@ export default function SonarLogsPage() {
         ])
         setIsAiAvailable(aiAvailable)
         setHasGitlabConnection(gitlabConnected)
+        
+        if (!aiAvailable.openai && aiAvailable.zai) {
+          setAiProvider('zai')
+        }
       } catch (error) {
         console.error('Error checking connections:', error)
       }
@@ -113,9 +119,19 @@ export default function SonarLogsPage() {
       return
     }
 
+    const available = aiProvider === 'openai' ? isAiAvailable.openai : isAiAvailable.zai
+    if (!available) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: `${aiProvider.toUpperCase()} API key is not configured. Please add ${aiProvider.toUpperCase()}_API_KEY to .env file`
+      })
+      return
+    }
+
     setLoading(true)
     try {
-      const result = await generateAIFixesAction(issues)
+      const result = await generateAIFixesAction(issues, aiProvider)
       setAiFixes(result)
       setIsAiFixesVisible(true)
       toast({
@@ -212,7 +228,7 @@ export default function SonarLogsPage() {
             <Label htmlFor="gitlab-url">GitLab Merge Request URL</Label>
             <Input
               id="gitlab-url"
-              placeholder="https://gitlabru.dot.com/life/implementation/-/merge_requests/12767"
+              placeholder="https://gitlabru.domain.com/life/implementation/-/merge_requests/12767"
               value={gitlabUrl}
               onChange={(e) => setGitlabUrl(e.target.value)}
             />
@@ -225,7 +241,7 @@ export default function SonarLogsPage() {
             <Label htmlFor="sonar-url">SonarQube URL</Label>
             <Input
               id="sonar-url"
-              placeholder="https://qube.dot.com/dashboard?id=configuration&pullRequest=12767"
+              placeholder="https://qube.domain.com/project/issues?id=RGSL-configuration&pullRequest=12767&issueStatuses=OPEN"
               value={sonarUrl}
               onChange={(e) => setSonarUrl(e.target.value)}
             />
@@ -263,12 +279,23 @@ export default function SonarLogsPage() {
         </Card>
       )}
 
-      {isAiAvailable && (
+      {(isAiAvailable.openai || isAiAvailable.zai) && (
         <>
           {issues && !isAiFixesVisible && (
-            <Button onClick={handleGenerateFixes} disabled={loading} className="w-full">
-              {loading ? 'Generating...' : 'Generate AI Fixes'}
-            </Button>
+            <div className="flex gap-2 items-center w-full">
+              <Select value={aiProvider} onValueChange={(value: 'openai' | 'zai') => setAiProvider(value)} disabled={loading}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai" disabled={!isAiAvailable.openai}>OpenAI</SelectItem>
+                  <SelectItem value="zai" disabled={!isAiAvailable.zai}>Z.AI</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={handleGenerateFixes} disabled={loading} className="flex-1">
+                {loading ? 'Generating...' : 'Generate AI Fixes'}
+              </Button>
+            </div>
           )}
 
           {isAiFixesVisible && (
