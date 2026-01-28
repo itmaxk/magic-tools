@@ -1,7 +1,7 @@
-const { Bot, GrammyError, HttpError } = require('grammy')
+import { Bot } from 'grammy'
 import type { Context } from 'grammy'
 
-const bot = new Bot(process.env.BOT_TOKEN)
+const bot = new Bot(process.env.BOT_TOKEN || '')
 
 bot.command('start', (ctx: Context) => {
   ctx.reply('Привет! Отправьте MR ID (например: 12767), и я получу SonarQube issues и отправлю их в GitLab.')
