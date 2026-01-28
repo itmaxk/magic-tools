@@ -1,19 +1,20 @@
-import { Bot } from 'grammy'
-import type { Context } from 'grammy'
+require('dotenv').config()
+const { Bot } = require('grammy')
+const fetch = require('node-fetch')
 
-console.log('[telegram-bot] Module loaded, BOT_TOKEN:', process.env.BOT_TOKEN ? 'SET' : 'NOT SET')
+console.log('[bot-server] Starting Telegram bot...')
 
 const bot = new Bot(process.env.BOT_TOKEN || '')
 
-bot.command('start', (ctx: Context) => {
+bot.command('start', (ctx) => {
   ctx.reply('Привет! Отправьте MR ID (например: 12767), и я получу SonarQube issues и отправлю их в GitLab.')
 })
 
-bot.command('help', (ctx: Context) => {
+bot.command('help', (ctx) => {
   ctx.reply('Использование: просто отправьте MR ID (например: 12767)')
 })
 
-bot.on('message:text', async (ctx: Context) => {
+bot.on('message:text', async (ctx) => {
   if (!ctx.message?.text) return
   const mrId = ctx.message.text.trim()
   
@@ -25,9 +26,9 @@ bot.on('message:text', async (ctx: Context) => {
   await processMrId(ctx, mrId)
 })
 
-async function processMrId(ctx: Context, mrId: string) {
+async function processMrId(ctx, mrId) {
   try {
-    const config = await fetch('http://localhost:3001/api/urls').then(r => r.json())
+    const config = await fetch('http://localhost:3003/api/urls').then(r => r.json())
     
     const gitlabUrl = `${config.gitlabUrl}/${config.gitlabProject}/implementation/-/merge_requests/${mrId}`
     
@@ -57,7 +58,7 @@ async function processMrId(ctx: Context, mrId: string) {
   }
 }
 
-async function fetchMergeRequestDetails(gitlabUrl: string) {
+async function fetchMergeRequestDetails(gitlabUrl) {
   const { projectPath, mrId } = parseGitlabUrl(gitlabUrl)
   
   const response = await fetch(
@@ -78,7 +79,7 @@ async function fetchMergeRequestDetails(gitlabUrl: string) {
   return { sonarUrl }
 }
 
-function parseGitlabUrl(url: string) {
+function parseGitlabUrl(url) {
   const urlObj = new URL(url)
   const pathParts = urlObj.pathname.split('/').filter(Boolean)
   const mrIndex = pathParts.indexOf('merge_requests')
@@ -93,7 +94,7 @@ function parseGitlabUrl(url: string) {
   return { projectPath, mrId }
 }
 
-function extractSonarLink(description: string | null): string | null {
+function extractSonarLink(description) {
   if (!description) return null
   
   const patterns = [
@@ -115,7 +116,7 @@ function extractSonarLink(description: string | null): string | null {
   return null
 }
 
-async function fetchSonarIssuesAction(sonarUrl: string) {
+async function fetchSonarIssuesAction(sonarUrl) {
   const urlObj = new URL(sonarUrl)
   const componentId = urlObj.searchParams.get('id')
   const pullRequest = urlObj.searchParams.get('pullRequest')
@@ -135,7 +136,7 @@ async function fetchSonarIssuesAction(sonarUrl: string) {
   return await response.text()
 }
 
-async function postIssuesToGitLab(gitlabUrl: string, sonarUrl: string, issues: string) {
+async function postIssuesToGitLab(gitlabUrl, sonarUrl, issues) {
   const { projectPath, mrId } = parseGitlabUrl(gitlabUrl)
   
   const comment = formatGitlabIssuesComment(sonarUrl, issues)
@@ -159,17 +160,11 @@ async function postIssuesToGitLab(gitlabUrl: string, sonarUrl: string, issues: s
   }
 }
 
-function formatGitlabIssuesComment(sonarUrl: string, issues: string) {
+function formatGitlabIssuesComment(sonarUrl, issues) {
   const issuesData = JSON.parse(issues)
   const issuesList = issuesData.issues || []
   
-  interface Issue {
-    severity: string
-    rule: string
-    message: string
-  }
-  
-  const issuesBySeverity: Record<string, Issue[]> = {
+  const issuesBySeverity = {
     BLOCKER: [],
     CRITICAL: [],
     MAJOR: [],
@@ -177,7 +172,7 @@ function formatGitlabIssuesComment(sonarUrl: string, issues: string) {
     INFO: []
   }
   
-  issuesList.forEach((issue: Issue) => {
+  issuesList.forEach(issue => {
     const severity = issue.severity
     if (issuesBySeverity[severity]) {
       issuesBySeverity[severity].push(issue)
@@ -200,7 +195,7 @@ function formatGitlabIssuesComment(sonarUrl: string, issues: string) {
     
     if (issuesBySeverity.BLOCKER.length > 0) {
       comment += `**BLOCKER:**\n`
-      issuesBySeverity.BLOCKER.slice(0, 5).forEach((issue: Issue) => {
+      issuesBySeverity.BLOCKER.slice(0, 5).forEach(issue => {
         comment += `- \`${issue.rule}\`: ${issue.message.substring(0, 100)}...\n`
       })
       if (issuesBySeverity.BLOCKER.length > 5) {
@@ -210,7 +205,7 @@ function formatGitlabIssuesComment(sonarUrl: string, issues: string) {
     
     if (issuesBySeverity.CRITICAL.length > 0) {
       comment += `**CRITICAL:**\n`
-      issuesBySeverity.CRITICAL.slice(0, 5).forEach((issue: Issue) => {
+      issuesBySeverity.CRITICAL.slice(0, 5).forEach(issue => {
         comment += `- \`${issue.rule}\`: ${issue.message.substring(0, 100)}...\n`
       })
       if (issuesBySeverity.CRITICAL.length > 5) {
@@ -222,4 +217,5 @@ function formatGitlabIssuesComment(sonarUrl: string, issues: string) {
   return comment
 }
 
-export { bot }
+bot.start()
+console.log('[bot-server] Telegram bot started successfully!')

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3003",
+    "dev:bot": "node bot-server.js",
     "build": "next build",
     "start": "next start -p 3003",
     "lint": "eslint",
@@ -27,6 +28,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "dotenv": "^17.2.3",
     "framer-motion": "^11.18.2",
     "grammy": "^1.39.3",
     "lucide-react": "^0.562.0",
