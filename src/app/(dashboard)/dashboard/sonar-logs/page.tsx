@@ -12,8 +12,15 @@ import { checkAiAvailability, checkGitlabConnection, fetchMergeRequestDetails, f
 import { sharedStyles } from '@/styles/shared'
 
 export default function SonarLogsPage() {
+  const [gitlabMrId, setGitlabMrId] = useState('')
   const [gitlabUrl, setGitlabUrl] = useState('')
   const [sonarUrl, setSonarUrl] = useState('')
+  const [urlConfig, setUrlConfig] = useState<{ gitlabUrl: string | null; gitlabProject: string | null; sonarUrl: string | null; sonarProject: string | null }>({
+    gitlabUrl: null,
+    gitlabProject: null,
+    sonarUrl: null,
+    sonarProject: null
+  })
   const [issues, setIssues] = useState('')
   const [aiFixes, setAiFixes] = useState('')
   const [isAiAvailable, setIsAiAvailable] = useState<{ openai: boolean; zai: boolean }>({ openai: false, zai: false })
@@ -42,6 +49,31 @@ export default function SonarLogsPage() {
     }
     checkConnections()
   }, [])
+
+  useEffect(() => {
+    async function fetchUrlConfig() {
+      try {
+        const response = await fetch('/api/urls')
+        const config = await response.json()
+        setUrlConfig(config)
+      } catch (error) {
+        console.error('Error fetching URL config:', error)
+      }
+    }
+    fetchUrlConfig()
+  }, [])
+
+  useEffect(() => {
+    if (gitlabMrId && urlConfig.gitlabUrl && urlConfig.gitlabProject) {
+      const generatedGitlabUrl = `${urlConfig.gitlabUrl}/${urlConfig.gitlabProject}/implementation/-/merge_requests/${gitlabMrId}`
+      setGitlabUrl(generatedGitlabUrl)
+      
+      if (urlConfig.sonarUrl && urlConfig.sonarProject) {
+        const generatedSonarUrl = `${urlConfig.sonarUrl}/component_measures?id=${urlConfig.sonarProject}&pullRequest=${gitlabMrId}&issueStatuses=OPEN`
+        setSonarUrl(generatedSonarUrl)
+      }
+    }
+  }, [gitlabMrId, urlConfig])
 
   async function handleFetchFromGitlab() {
     if (!gitlabUrl) {
@@ -224,6 +256,15 @@ export default function SonarLogsPage() {
           <CardDescription>Fetch and analyze SonarQube issues from GitLab merge requests</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="mr-id">MR (Sonar) Id</Label>
+            <Input
+              id="mr-id"
+              placeholder="Enter MR ID (e.g., 12767)"
+              value={gitlabMrId}
+              onChange={(e) => setGitlabMrId(e.target.value)}
+            />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="gitlab-url">GitLab Merge Request URL</Label>
             <Input
