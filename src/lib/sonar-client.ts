@@ -41,7 +41,7 @@ export async function getIssues(
   issueStatuses: string
 ): Promise<SonarIssuesResponse> {
   const apiUrl = new URL(`${process.env.SONAR_URL}/api/issues/search`)
-  apiUrl.searchParams.append('id', projectKey)
+  apiUrl.searchParams.append('components', projectKey)
   apiUrl.searchParams.append('pullRequest', pullRequest)
   
   issueStatuses = issueStatuses === 'OPEN' ? 'OPEN' : issueStatuses
