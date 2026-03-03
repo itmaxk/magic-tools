@@ -7,10 +7,10 @@ import {
 
 export async function GET(
   request: Request,
-  { params }: { params: { mrId: string } }
+  { params }: { params: Promise<{ mrId: string }> }
 ) {
   try {
-    const mrId = params.mrId
+    const { mrId } = await params
     
     if (!/^\d+$/.test(mrId)) {
       return NextResponse.json(

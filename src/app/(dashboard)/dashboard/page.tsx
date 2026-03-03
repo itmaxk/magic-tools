@@ -22,7 +22,7 @@ export default async function DashboardPage() {
     },
     {
       title: 'Sonar Logs',
-      description: 'Analyze code quality reports with AI insights',
+      description: 'Analyze code quality reports from SonarQube',
       icon: Activity,
       href: '/dashboard/sonar-logs',
       gradient: 'from-orange-500 to-red-500',

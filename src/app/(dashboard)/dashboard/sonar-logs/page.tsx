@@ -6,9 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { checkAiAvailability, checkGitlabConnection, fetchMergeRequestDetails, fetchSonarIssuesAction, generateAIFixesAction, postIssuesToGitLab, postAIFixesToGitLab } from '@/actions/sonar-actions'
+import { checkGitlabConnection, fetchMergeRequestDetails, fetchSonarIssuesAction, postIssuesToGitLab } from '@/actions/sonar-actions'
 import { sharedStyles } from '@/styles/shared'
 
 export default function SonarLogsPage() {
@@ -22,10 +21,6 @@ export default function SonarLogsPage() {
     sonarProject: null
   })
   const [issues, setIssues] = useState('')
-  const [aiFixes, setAiFixes] = useState('')
-  const [isAiAvailable, setIsAiAvailable] = useState<{ openai: boolean; zai: boolean }>({ openai: false, zai: false })
-  const [aiProvider, setAiProvider] = useState<'openai' | 'zai'>('openai')
-  const [isAiFixesVisible, setIsAiFixesVisible] = useState(false)
   const [hasGitlabConnection, setHasGitlabConnection] = useState(false)
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
@@ -33,16 +28,8 @@ export default function SonarLogsPage() {
   useEffect(() => {
     async function checkConnections() {
       try {
-        const [aiAvailable, gitlabConnected] = await Promise.all([
-          checkAiAvailability(),
-          checkGitlabConnection()
-        ])
-        setIsAiAvailable(aiAvailable)
+        const gitlabConnected = await checkGitlabConnection()
         setHasGitlabConnection(gitlabConnected)
-        
-        if (!aiAvailable.openai && aiAvailable.zai) {
-          setAiProvider('zai')
-        }
       } catch (error) {
         console.error('Error checking connections:', error)
       }
@@ -141,46 +128,6 @@ export default function SonarLogsPage() {
     }
   }
 
-  async function handleGenerateFixes() {
-    if (!issues) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Please fetch issues first'
-      })
-      return
-    }
-
-    const available = aiProvider === 'openai' ? isAiAvailable.openai : isAiAvailable.zai
-    if (!available) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: `${aiProvider.toUpperCase()} API key is not configured. Please add ${aiProvider.toUpperCase()}_API_KEY to .env file`
-      })
-      return
-    }
-
-    setLoading(true)
-    try {
-      const result = await generateAIFixesAction(issues, aiProvider)
-      setAiFixes(result)
-      setIsAiFixesVisible(true)
-      toast({
-        title: 'Success',
-        description: 'AI fixes generated successfully'
-      })
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to generate AI fixes'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   async function handlePostIssuesToGitlab() {
     if (!gitlabUrl || !sonarUrl || !issues) {
       toast({
@@ -203,34 +150,6 @@ export default function SonarLogsPage() {
         variant: 'destructive',
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to post issues to GitLab'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handlePostAIFixesToGitlab() {
-    if (!gitlabUrl || !aiFixes) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Missing required data'
-      })
-      return
-    }
-
-    setLoading(true)
-    try {
-      await postAIFixesToGitLab(gitlabUrl, aiFixes)
-      toast({
-        title: 'Success',
-        description: 'AI fixes posted to GitLab successfully'
-      })
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to post AI fixes to GitLab'
       })
     } finally {
       setLoading(false)
@@ -320,53 +239,6 @@ export default function SonarLogsPage() {
         </Card>
       )}
 
-      {(isAiAvailable.openai || isAiAvailable.zai) && (
-        <>
-          {issues && !isAiFixesVisible && (
-            <div className="flex gap-2 items-center w-full">
-              <Select value={aiProvider} onValueChange={(value: 'openai' | 'zai') => setAiProvider(value)} disabled={loading}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai" disabled={!isAiAvailable.openai}>OpenAI</SelectItem>
-                  <SelectItem value="zai" disabled={!isAiAvailable.zai}>Z.AI</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button onClick={handleGenerateFixes} disabled={loading} className="flex-1">
-                {loading ? 'Generating...' : 'Generate AI Fixes'}
-              </Button>
-            </div>
-          )}
-
-          {isAiFixesVisible && (
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Fixes</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Textarea
-                    value={aiFixes}
-                    readOnly
-                    rows={20}
-                    onClick={() => copyToClipboard(aiFixes)}
-                    className="cursor-pointer active-textarea"
-                  />
-                  <div className="flex gap-2">
-                    <Button onClick={() => copyToClipboard(aiFixes)}>Copy</Button>
-                    {hasGitlabConnection && (
-                      <Button onClick={handlePostAIFixesToGitlab} disabled={loading}>
-                        {loading ? 'Posting...' : 'Post AI Fixes to GitLab'}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
     </div>
   )
 }

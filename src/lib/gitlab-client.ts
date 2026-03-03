@@ -86,15 +86,6 @@ ${issues}
 `
 }
 
-export function formatGitlabAIFixesComment(aiFixes: string): string {
-  return `## 💡Предложения по исправлению валидаций SonarCube (необходима проверка):
-
-\`\`\`
-${aiFixes}
-\`\`\`
-`
-}
-
 export async function postMergeRequestComment(
   projectPath: string,
   mrId: string,

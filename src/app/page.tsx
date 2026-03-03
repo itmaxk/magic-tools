@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Code2, Database, FileJson, Activity, Zap } from 'lucide-react'
+import { Code2, Database, FileJson, Activity } from 'lucide-react'
 
 export default function Home() {
   return (
@@ -11,15 +11,11 @@ export default function Home() {
       <main className="relative z-10 px-4 py-20">
         <div className="mx-auto max-w-6xl">
           <div className="mb-16 text-center">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-purple-500/10 px-4 py-2 text-sm text-purple-400 border border-purple-500/20">
-              <Zap className="h-4 w-4" />
-              <span>AI-Powered Tools</span>
-            </div>
             <h1 className="mb-6 text-6xl font-bold gradient-text">
               Magic Tools
             </h1>
             <p className="mx-auto max-w-2xl text-xl text-zinc-400">
-              Advanced web tools for modern development teams with AI capabilities
+              Advanced web tools for modern development teams
             </p>
           </div>
 
@@ -28,7 +24,7 @@ export default function Home() {
               <Database className="mb-4 h-10 w-10 text-purple-400 group-hover:scale-110 transition-transform" />
               <h3 className="mb-2 text-xl font-semibold">SQL Mapper</h3>
               <p className="text-zinc-400">
-                Visual SQL query builder with AI-powered optimization suggestions
+                Parse SQL queries and generate mapping files for integration
               </p>
             </div>
 
@@ -44,7 +40,7 @@ export default function Home() {
               <Activity className="mb-4 h-10 w-10 text-purple-400 group-hover:scale-110 transition-transform" />
               <h3 className="mb-2 text-xl font-semibold">Sonar Logs</h3>
               <p className="text-zinc-400">
-                Analyze and visualize code quality reports with AI insights
+                Analyze and visualize code quality reports from SonarQube
               </p>
             </div>
           </div>

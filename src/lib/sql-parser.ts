@@ -41,21 +41,74 @@ function extractPostgresParameters(sql: string): SqlParameter[] {
   }))
 }
 
-function extractPostgresColumns(sql: string): SqlColumn[] {
-  const selectRegex = /SELECT\s+([\s\S]+?)\s+FROM/i
-  const match = sql.match(selectRegex)
+function extractColumnsString(sql: string): string | null {
+  const upperSql = sql.toUpperCase()
+  const selectIndex = upperSql.indexOf('SELECT')
+  if (selectIndex === -1) return null
 
-  if (!match) {
+  let depth = 0
+  let i = selectIndex + 6 // skip "SELECT"
+
+  // Skip whitespace after SELECT
+  while (i < sql.length && /\s/.test(sql[i])) i++
+
+  const start = i
+
+  for (; i < sql.length; i++) {
+    if (sql[i] === '(') {
+      depth++
+    } else if (sql[i] === ')') {
+      depth--
+    } else if (depth === 0) {
+      // Check for FROM at depth 0
+      if (upperSql.substring(i, i + 4) === 'FROM' && (i === 0 || /\s/.test(sql[i - 1]))) {
+        return sql.substring(start, i).trim()
+      }
+    }
+  }
+
+  return null
+}
+
+function splitColumnsByComma(columnsStr: string): string[] {
+  const result: string[] = []
+  let depth = 0
+  let current = ''
+
+  for (let i = 0; i < columnsStr.length; i++) {
+    if (columnsStr[i] === '(') {
+      depth++
+      current += columnsStr[i]
+    } else if (columnsStr[i] === ')') {
+      depth--
+      current += columnsStr[i]
+    } else if (columnsStr[i] === ',' && depth === 0) {
+      result.push(current.trim())
+      current = ''
+    } else {
+      current += columnsStr[i]
+    }
+  }
+
+  if (current.trim()) {
+    result.push(current.trim())
+  }
+
+  return result
+}
+
+function extractColumns(sql: string): SqlColumn[] {
+  const columnsStr = extractColumnsString(sql)
+
+  if (!columnsStr) {
     return []
   }
 
-  const columnsStr = match[1]
-  const columns = columnsStr
-    .split(',')
-    .map((col) => {
-      const trimmed = col.trim()
-      const aliasMatch = trimmed.match(/(?:\w+(?:\.\w+)?\s+)?AS\s+([^\s]+)$/i)
-      
+  const columnTokens = splitColumnsByComma(columnsStr)
+  const columns = columnTokens
+    .map((trimmed) => {
+      const aliasMatch = trimmed.match(/\)\s+AS\s+([^\s]+)$/i) || trimmed.match(/(?:\w+(?:\.\w+)?\s+)?AS\s+([^\s]+)$/i)
+
       if (aliasMatch) {
         const alias = aliasMatch[1]
         return {
@@ -63,7 +116,12 @@ function extractPostgresColumns(sql: string): SqlColumn[] {
           camelCase: toCamelCase(alias)
         }
       }
-      
+
+      // If it's a subquery without alias, skip it
+      if (trimmed.startsWith('(') || /^\([\s\S]+\)$/.test(trimmed)) {
+        return { name: '', camelCase: '' }
+      }
+
       const noAlias = trimmed.replace(/\s+AS\s+[^\s]+$/i, '')
       const parts = noAlias.split('.')
       const lastPart = parts[parts.length - 1]
@@ -93,43 +151,6 @@ function extractMySQLParameters(sql: string): SqlParameter[] {
   }))
 }
 
-function extractMySQLColumns(sql: string): SqlColumn[] {
-  const selectRegex = /SELECT\s+([\s\S]+?)\s+FROM/i
-  const match = sql.match(selectRegex)
-
-  if (!match) {
-    return []
-  }
-
-  const columnsStr = match[1]
-  const columns = columnsStr
-    .split(',')
-    .map((col) => {
-      const trimmed = col.trim()
-      const aliasMatch = trimmed.match(/(?:\w+(?:\.\w+)?\s+)?AS\s+([^\s]+)$/i)
-      
-      if (aliasMatch) {
-        const alias = aliasMatch[1]
-        return {
-          name: alias.toUpperCase(),
-          camelCase: toCamelCase(alias)
-        }
-      }
-      
-      const noAlias = trimmed.replace(/\s+AS\s+[^\s]+$/i, '')
-      const parts = noAlias.split('.')
-      const lastPart = parts[parts.length - 1]
-      const name = lastPart.toUpperCase()
-      return {
-        name,
-        camelCase: toCamelCase(name)
-      }
-    })
-    .filter((col) => col.name)
-
-  return columns
-}
-
 export function detectDialect(sql: string): 'postgres' | 'mysql' {
   const hasPostgresParam = /@\w+/.test(sql)
   const hasMySQLParam = /:\w+/.test(sql)
@@ -141,16 +162,13 @@ export function detectDialect(sql: string): 'postgres' | 'mysql' {
 
 export function parseSql(sql: string, dialect?: 'postgres' | 'mysql'): SqlParseResult {
   const detectedDialect = dialect || detectDialect(sql)
-  if (detectedDialect === 'postgres') {
-    return {
-      parameters: extractPostgresParameters(sql),
-      columns: extractPostgresColumns(sql),
-    }
-  } else {
-    return {
-      parameters: extractMySQLParameters(sql),
-      columns: extractMySQLColumns(sql),
-    }
+  const parameters = detectedDialect === 'postgres'
+    ? extractPostgresParameters(sql)
+    : extractMySQLParameters(sql)
+
+  return {
+    parameters,
+    columns: extractColumns(sql),
   }
 }
 
