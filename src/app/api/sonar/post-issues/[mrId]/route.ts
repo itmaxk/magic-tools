@@ -5,10 +5,12 @@ import {
   postIssuesToGitLab
 } from '@/actions/sonar-actions'
 
-export async function POST(
+async function handler(
   request: Request,
   { params }: { params: Promise<{ mrId: string }> }
 ) {
+  console.log('[post-issues] Route hit')
+
   try {
     const { mrId } = await params
 
@@ -60,3 +62,6 @@ export async function POST(
     )
   }
 }
+
+export const GET = handler
+export const POST = handler
