@@ -81,11 +81,16 @@ export default function SonarLogsPage() {
           title: 'Success',
           description: 'SonarQube link found and set'
         })
+      } else if (sonarUrl) {
+        toast({
+          title: 'Link not found',
+          description: 'SonarQube link not found in MR description. Using auto-generated URL — you can edit it if needed.'
+        })
       } else {
         toast({
           variant: 'destructive',
           title: 'Link not found',
-          description: 'Could not find "See analysis details on SonarQube" link. Please enter SonarQube URL manually.'
+          description: 'SonarQube link not found in MR description. Please enter SonarQube URL manually.'
         })
       }
     } catch (error) {
